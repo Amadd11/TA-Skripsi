@@ -25,9 +25,6 @@ class RolePermissionSeeder extends Seeder
             'password' => Hash::make('password'), // Jangan lupa untuk mengganti dengan password yang aman
         ]);
 
-        // Menetapkan role 'super-admin' ke pengguna ini
-        $superAdmin->assignRole('super-admin');
-
         // Membuat perawat
         $perawat = User::create([
             'name' => 'Perawat',

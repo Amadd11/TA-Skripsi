@@ -21,7 +21,9 @@ class JadwalPemberianObat extends Model
         'keterangan',
         'waktu',
         'ruangan_id',
+        'obat_id',
         'pasien_id',
+        'pemberian_id',
         'user_id',
         'pengingat',
         'status',
@@ -69,9 +71,13 @@ class JadwalPemberianObat extends Model
     {
         return $this->belongsTo(Ruangan::class);
     }
+    public function pemberianObat()
+    {
+        return $this->hasOne(PemberianObat::class);
+    }
 
     public function obats()
     {
-        return $this->belongsToMany(PemberianObat::class, 'obat_pemberian_obats');
+        return $this->belongsToMany(Obat::class, 'obat_pemberian_obats');
     }
 }

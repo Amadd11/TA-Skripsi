@@ -8,9 +8,13 @@ use Filament\Forms\Set;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use App\Models\JadwalPemberianObat;
 use Filament\Tables\Actions\Action;
+use Illuminate\Support\Facades\Auth;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,10 +26,15 @@ class JadwalPemberianObatResource extends Resource
 {
     protected static ?string $model = JadwalPemberianObat::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+
+    protected static ?string $navigationLabel = 'Jadwal Pemberian Obat';
 
     public static function form(Form $form): Form
     {
+        $user = Filament::auth()->user();
+
+
         return $form
             ->schema([
                 Forms\Components\TextInput::make('title')
@@ -34,15 +43,17 @@ class JadwalPemberianObatResource extends Resource
                     ->lazy()
                     ->maxLength(255),
                 Forms\Components\Select::make('obat_id')
-                    ->relationship('obats', 'nama')
+                    ->relationship('obats', 'nama_obat')
                     ->required()
                     ->multiple()
                     ->label('Obat')  // Label untuk form input
                     ->searchable()  // Opsional: memungkinkan pencarian dalam daftar obat
                     ->preload(),  //
-                Forms\Components\Select::make('user_id')
+                $user->hasRole('perawat')
+                    ? Hidden::make('user_id')->default($user->id)
+                    : Select::make('user_id')
                     ->label('Perawat')
-                    ->relationship(name: 'perawat', titleAttribute: 'name') // Ambil nama pasien
+                    ->relationship('perawat', 'name')
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -88,12 +99,12 @@ class JadwalPemberianObatResource extends Resource
                     ->label('Nama Pasien')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('obats.nama') // Ambil nama dari relasi
+                Tables\Columns\TextColumn::make('obats.nama_obat') // Ambil nama dari relasi
                     ->label('Nama Obat')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('perawat.name') // Ambil nama dari relasi
-                    ->label('Nama Obat')
+                    ->label('Nama Perawat')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('dosis')
@@ -127,24 +138,16 @@ class JadwalPemberianObatResource extends Resource
             ->actions([
                 Tables\Actions\Action::make('diberikan')
                     ->label('Tandai Diberikan')
-                    ->button() // Menggunakan badge alih-alih tombol
-                    ->color('success') // Hijau untuk 'diberikan'
-                    ->requiresConfirmation() // Memerlukan konfirmasi sebelum aksi
-                    ->action(function (JadwalPemberianObat $jadwalpemberianobat) {
-                        // Mengubah status jadwal menjadi 'diberikan'
-                        $jadwalpemberianobat->update([
-                            'status' => 'diberikan',
-                        ]);
-
-                        // Menampilkan notifikasi
-                        Notification::make()
-                            ->success()
-                            ->title('Obat Diberikan')
-                            ->body('Status jadwal berhasil diperbarui ke "diberikan".')
-                            ->icon('heroicon-o-check')
-                            ->send();
-                    })
-                    ->hidden(fn(JadwalPemberianObat $jadwalpemberianobat) => $jadwalpemberianobat->status !== 'waiting'), // Menyembunyikan aksi jika status bukan 'waiting'
+                    ->button()
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->url(
+                        fn(JadwalPemberianObat $jadwal) =>
+                        route('filament.admin.resources.pemberian-obats.create', [
+                            'jadwal_id' => $jadwal->id,
+                        ])
+                    )
+                    ->hidden(fn(JadwalPemberianObat $jadwal) => $jadwal->status !== 'waiting'),
 
                 Tables\Actions\Action::make('canceled')
                     ->label('Tandai Dibatalkan')
@@ -175,6 +178,19 @@ class JadwalPemberianObatResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Filament::auth()->user();
+
+        if ($user && $user->hasRole('perawat')) {
+            $query->where('user_id', $user->id);
+        }
+
+        return $query;
     }
 
     public static function getRelations(): array

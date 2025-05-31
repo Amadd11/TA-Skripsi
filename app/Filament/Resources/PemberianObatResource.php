@@ -7,8 +7,11 @@ use Filament\Tables;
 use Filament\Forms\Form;
 use Filament\Tables\Table;
 use App\Models\PemberianObat;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
+use App\Models\JadwalPemberianObat;
 use Filament\Support\Enums\FontWeight;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Resources\PemberianObatResource\Pages;
@@ -18,12 +21,37 @@ class PemberianObatResource extends Resource
 {
     protected static ?string $model = PemberianObat::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-check-badge';
+
+    protected static ?string $navigationLabel = 'Pemberian Obat';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
+                Forms\Components\Select::make('pasien_id')
+                    ->label('Pasien')
+                    ->relationship('pasien', titleAttribute: 'nama') // Ambil nama pasien
+                    ->searchable()
+                    ->preload()
+                    ->default(function () {
+                        $jadwalId = request()->get('jadwal_id');
+                        if ($jadwalId) {
+                            return JadwalPemberianObat::find($jadwalId)?->pasien_id;
+                        }
+                        return null;
+                    })
+                    ->disabled(),
+                Forms\Components\Select::make('user_id')
+                    ->label('Perawat')
+                    ->relationship('perawat', titleAttribute: 'name') // Ambil nama pasien
+                    ->searchable()
+                    ->preload()
+                    ->default(auth()->user()->id)
+                    ->disabled(),
+                Forms\Components\Hidden::make('jadwal_pemberian_obat_id')
+                    ->default(fn() => request()->get('jadwal_id'))
+                    ->required(),
                 Forms\Components\Toggle::make('centang_semua')
                     ->label('Choose All')
                     ->live() // Agar langsung bereaksi saat diubah
@@ -48,10 +76,6 @@ class PemberianObatResource extends Resource
                             $set($field, $state);
                         }
                     }),
-                Forms\Components\TextInput::make('nama')
-                    ->required()
-                    ->maxLength(255)
-                    ->columnSpanFull(),
 
                 Forms\Components\Toggle::make('benar_pasien')
                     ->required(),
@@ -84,11 +108,13 @@ class PemberianObatResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('nama')
+                Tables\Columns\TextColumn::make('pasien.nama')
+                    ->label('Nama Pasien')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('perawat.name') // Ambil nama dari relasi
+                    ->label('Nama Perawat')
                     ->searchable()
-                    ->weight(FontWeight::Bold)
-                    ->color(fn($record) => self::getObatColor($record)),
-
+                    ->sortable(),
                 // Checklist boolean lainnya
                 Tables\Columns\IconColumn::make('benar_pasien')->boolean(),
                 Tables\Columns\IconColumn::make('benar_obat')->boolean(),
@@ -111,11 +137,54 @@ class PemberianObatResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('status')
+                    ->label('Status')
+                    ->icon(fn(PemberianObat $record) => match (self::getObatColor($record)) {
+                        'success' => 'heroicon-o-shield-check',  // Ikon hijau untuk Lengkap
+                        'warning' => 'heroicon-o-exclamation-circle',  // Ikon kuning untuk Setengah
+                        'danger' => 'heroicon-o-x-mark',  // Ikon merah untuk Kurang
+                        default => 'heroicon-o-question-mark-circle',  // Ikon fallback
+                    })
+                    ->color(fn(PemberianObat $record) => self::getObatColor($record))  // Memberikan warna sesuai status
+                    ->tooltip(fn(PemberianObat $record) => match (self::getObatColor($record)) {
+                        'success' => 'Lengkap',
+                        'warning' => 'Setengah',
+                        'danger' => 'Kurang',
+                        default => 'Status tidak diketahui',
+                    })
+                    ->getStateUsing(function (PemberianObat $record) {
+                        $totalChecklist = 12;
+                        $checkedCount = collect([
+                            $record->benar_pasien,
+                            $record->benar_obat,
+                            $record->benar_dosis,
+                            $record->benar_cara,
+                            $record->benar_waktu,
+                            $record->benar_dokumentasi,
+                            $record->benar_alasan,
+                            $record->benar_respon,
+                            $record->benar_edukasi,
+                            $record->benar_evaluasi,
+                            $record->benar_bentuk,
+                            $record->benar_penyimpanan,
+                        ])->filter()->count();
+
+                        return match (true) {
+                            $checkedCount === $totalChecklist => 'Lengkap',
+                            $checkedCount >= ($totalChecklist / 2) => 'Setengah',
+                            default => 'Kurang',
+                        };
+                    })
+                    ->sortable(),
+
+
+
             ])
             ->filters([
                 //
             ])
             ->actions([
+                Tables\Actions\DeleteAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -123,6 +192,18 @@ class PemberianObatResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        $user = Filament::auth()->user();
+
+        if ($user && $user->hasRole('perawat')) {
+            $query->where('user_id', $user->id);
+        }
+
+        return $query;
     }
 
     /**

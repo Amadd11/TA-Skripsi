@@ -17,7 +17,9 @@ class RuanganResource extends Resource
 {
     protected static ?string $model = Ruangan::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-home-modern';
+
+    protected static ?string $navigationLabel = 'Ruangan';
 
     public static function form(Form $form): Form
     {
@@ -60,6 +62,7 @@ class RuanganResource extends Resource
                 //
             ])
             ->actions([
+                Tables\Actions\DeleteAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

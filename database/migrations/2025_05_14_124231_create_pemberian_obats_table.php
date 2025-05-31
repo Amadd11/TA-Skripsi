@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('pemberian_obats', function (Blueprint $table) {
             $table->id();
-            $table->string('nama');
+            $table->foreignId('pasien_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->boolean('benar_pasien');
             $table->boolean('benar_obat');
             $table->boolean('benar_dosis');

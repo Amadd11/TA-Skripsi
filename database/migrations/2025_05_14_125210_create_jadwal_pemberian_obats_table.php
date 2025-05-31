@@ -17,22 +17,22 @@ return new class extends Migration
             $table->foreignId('pasien_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('ruangan_id')->constrained()->onDelete('cascade');
-            $table->string('slug')->unique();
+            $table->foreignId('pemberian_obat_id')->nullable()->constrained()->onDelete('cascade');
+            $table->string('slug');
             $table->string('dosis');
             $table->string('rute');
             $table->string('interval');
             $table->text('keterangan')->nullable();
-            $table->time('waktu');
-            $table->string('pengingat');
+            $table->dateTime('waktu');
+            $table->string('pengingat')->nullable();
             $table->enum('status', ['waiting', 'diberikan', 'canceled']);
             $table->timestamps();
-            $table->softDeletes();
         });
 
         // Tabel pivot untuk hubungan many-to-many antara obat dan pemberian_obat
         Schema::create('obat_pemberian_obats', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('pemberian_obat_id')->constrained()->onDelete('cascade');
+            $table->foreignId('obat_id')->constrained()->onDelete('cascade'); // Perbaikan disini
             $table->foreignId('jadwal_pemberian_obat_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
@@ -43,6 +43,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('obat_pemberian_obats'); // Perbaikan disini: drop tabel pivot
         Schema::dropIfExists('jadwal_pemberian_obats');
     }
 };

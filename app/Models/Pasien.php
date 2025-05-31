@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Pasien extends Model
 {
     //
-    //
     use HasFactory;
     //
     protected $fillable = [
@@ -29,5 +28,9 @@ class Pasien extends Model
         if ($value) {
             $this->attributes['usia'] = Carbon::parse($value)->age;
         }
+    }
+    public function jadwalPemberianObat()
+    {
+        return $this->hasMany(JadwalPemberianObat::class, 'pasien_id'); // pasang relasi dengan kolom pasien_id
     }
 }

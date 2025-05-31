@@ -19,7 +19,9 @@ class PasienResource extends Resource
 {
     protected static ?string $model = Pasien::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-users';
+
+    protected static ?string $navigationLabel = 'Pasien';
 
     public static function form(Form $form): Form
     {
@@ -91,6 +93,7 @@ class PasienResource extends Resource
                 //
             ])
             ->actions([
+                Tables\Actions\DeleteAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
